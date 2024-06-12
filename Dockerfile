@@ -9,8 +9,8 @@ ENV MYSQL_ROOT_PASSWORD=${mysql_root_pw}
 # Set the working directory in the container to /app
 WORKDIR /app
 
-# Add the current directory contents into the container at /app
-ADD . /app
+# Add the app directory contents into the container at /app
+ADD app /app
 
 # Upgrade pip and setuptools
 RUN pip install --no-cache-dir --upgrade pip setuptools

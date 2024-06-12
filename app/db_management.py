@@ -2,7 +2,7 @@ import mysql.connector
 import os
 from os.path import join, dirname
 from dotenv import load_dotenv
-dotenv_path = join(dirname(__file__), '.env')
+dotenv_path = join(dirname(__file__), '../.env')
 load_dotenv(dotenv_path)
 
 # database and user have to be created first of all

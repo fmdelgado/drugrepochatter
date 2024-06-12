@@ -12,8 +12,8 @@ services:
     depends_on:
       - db
     volumes:
-      - ./indexes:/app/indexes  # Synchronize with the 'indexes' directory in your repo
-      - .:/app  # Ensure the current directory is correctly mounted
+      - ./app/indexes:/app/indexes  # Synchronize with the 'indexes' directory in your repo
+      - ./app:/app/app  # Ensure the current directory is correctly mounted
 
   db:
     container_name: drugrepochatdb
