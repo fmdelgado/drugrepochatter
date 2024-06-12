@@ -9,10 +9,13 @@ services:
       - .env
     ports:
       - "${port_mapping}"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    restart: always
     depends_on:
       - db
     volumes:
-      - ./app/indexes:/app/indexes  # Synchronize with the 'indexes' directory in your repo
+      - ./app/indexes:/app/app/indexes  # Synchronize with the 'indexes' directory in your repo
       - ./app:/app/app  # Ensure the current directory is correctly mounted
 
   db:
