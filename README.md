@@ -2,6 +2,10 @@
 
 # DrugRepoChatter: AI-Powered Assistant for Academic Research in Drug Discovery
 
+<p align="center">
+  <img src="https://github.com/fmdelgado/drugrepochatter/blob/main/app/img/logo.png?raw=true" width="200"/>
+</p>
+
 
 ## Introduction
 The challenge of keeping pace with the exponential growth of scientific literature is a significant obstacle in drug discovery research. To address this challenge, we have developed DrugRepoChatter, an AI-powered assistant designed to facilitate efficient and accurate information retrieval within a large corpus of scientific documents.
