@@ -1,0 +1,29 @@
+version: '3.4'
+
+services:
+  app:
+    image: drugrepochat
+    container_name: drugrepochat
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "${port_mapping}"
+    depends_on:
+      - db
+    volumes:
+      - ./indexes:/app/indexes  # Synchronize with the 'indexes' directory in your repo
+      - .:/app  # Ensure the current directory is correctly mounted
+
+  db:
+    container_name: drugrepochatdb
+    platform: linux/x86_64  # Specify platform for emulation
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: "${root_pw}"
+    ports:
+      - "3306:3306"
+
+volumes:
+  index_volume:
+    driver: local
