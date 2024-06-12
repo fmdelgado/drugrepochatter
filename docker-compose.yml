@@ -2,7 +2,7 @@ version: '3.4'
 
 services:
   app:
-    image: drugrepochat
+    image: ghcr.io/fmdelgado/drugrepochatter:main
     container_name: drugrepochat
     build: .
     env_file:
