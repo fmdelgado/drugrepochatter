@@ -23,7 +23,7 @@ def get_image_base64(image_path):
 
 
 MAX_REQUESTS = 10
-WAIT_TIME = 60 # seconds
+WAIT_TIME = 60  # seconds
 
 
 def is_user_logged_in():
@@ -217,8 +217,9 @@ def process_llm_response(llm_response, doc_content=True):
 
 
 def qanda_page():
-    chaintype="stuff"
-    chaintype = st.selectbox("Please select chain type", options=['stuff', "map_reduce", "refine"] ,index=0)
+    chaintype = "stuff"
+    score_threshold = 0.9
+    score_threshold = st.slider("Score threshold", min_value=0.0, max_value=1.0, value=score_threshold, step=0.1)
     default_k = 4
     selected_k = st.slider("k", min_value=1, max_value=50, value=default_k, step=1)
     default_fetch_k = 20
@@ -243,16 +244,17 @@ def qanda_page():
     reproduce_chat_if_user_logged_in("messagesqanda")
     start_new_chat_if_empty("messagesqanda")
     print_current_chat("messagesqanda")
-     
+
     if st.session_state.lock_until_qanda > time.time():
-        st.write(f"You have reached your limit of {MAX_REQUESTS} questions. Please wait {int(st.session_state.lock_until_qanda - time.time())} seconds.")
+        st.write(
+            f"You have reached your limit of {MAX_REQUESTS} questions. Please wait {int(st.session_state.lock_until_qanda - time.time())} seconds.")
         st.session_state.request_count_qanda = 0
         return
-    
-    st.session_state.request_count_qanda += 1  
+
+    st.session_state.request_count_qanda += 1
 
     if st.session_state.request_count_qanda > MAX_REQUESTS:
-        st.session_state.lock_until_qanda = time.time() + WAIT_TIME 
+        st.session_state.lock_until_qanda = time.time() + WAIT_TIME
 
     prompt = get_user_message("messagesqanda")
     if prompt:
@@ -267,6 +269,7 @@ def qanda_page():
                                 You are allowed to rephrase the answer based on the context. \
                                 Do not answer any questions using your pre-trained knowledge, only use the information provided in the context.\
                                 Do not answer any questions that do not relate to drug repurposing, omics data, bioinformatics and data anlaysis.\
+                                If none of the articles answer the question, just say you don't know.  
                                 Question: {question}
                               """
             PROMPT = PromptTemplate.from_template(PROMPT_TEMPLATE)
@@ -277,7 +280,8 @@ def qanda_page():
                 chain_type=chaintype,
                 chain_type_kwargs={"prompt": PROMPT},
                 retriever=index.as_retriever(search_type="mmr",
-                                             search_kwargs={'fetch_k': selected_fetch_k,
+                                             search_kwargs={'score_threshold': score_threshold,
+                                                            'fetch_k': selected_fetch_k,
                                                             'k': selected_k}),
                 return_source_documents=True
             )
@@ -287,7 +291,7 @@ def qanda_page():
             # text = f"{llm_response['result']}\nSources:\n{process_llm_response(llm_response, doc_content=showdocs)}"
             # Convert Markdown to HTML
             html_content = markdown.markdown(llm_response['result'])
-            if "In your provided context i don" in llm_response['result']:
+            if "In your provided context I don" in llm_response['result']:
                 text = f"{html_content}"
             else:
                 text = f"{html_content}<br><strong>Sources:</strong><br>{process_llm_response(llm_response, doc_content=show_sources)}"
@@ -349,6 +353,7 @@ def about_page():
 
     This project is funded by the European Union under grant agreement No. 101057619. Views and opinions expressed are however those of the author(s) only and do not necessarily reflect those of the European Union or European Health and Digital Executive Agency (HADEA). Neither the European Union nor the granting authority can be held responsible for them. This work was also partly supported by the Swiss State Secretariat for Education, Research and Innovation (SERI) under contract No. 22.00115.
     """)
+
 
 def sign_up():
     st.subheader("Create an Account")
@@ -436,7 +441,6 @@ def main():
         qanda_page()
     elif page == "About":
         about_page()
-
 
 
 if __name__ == "__main__":
