@@ -14,6 +14,8 @@ services:
     restart: always
     depends_on:
       - db
+    networks:
+      - drugrepochatter_net
     volumes:
       - ./app/indexes:/app/app/indexes  # Synchronize with the 'indexes' directory in your repo
       - ./app:/app/app  # Ensure the current directory is correctly mounted
@@ -22,11 +24,16 @@ services:
     container_name: drugrepochatdb
     platform: linux/x86_64  # Specify platform for emulation
     image: mysql:5.7
+    networks:
+      - drugrepochatter_net
+    volumes:
+      - drugrepochatterdb_volume:/var/lib/mysql
     environment:
       MYSQL_ROOT_PASSWORD: "${root_pw}"
-    ports:
-      - "3306:3306"
 
 volumes:
   index_volume:
     driver: local
+  drugrepochatterdb_volume:
+networks:
+  drugrepochatter_net:

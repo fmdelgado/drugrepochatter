@@ -2,3 +2,4 @@
 /app/kim_packages.txt
 /.env
 /app/running_docker
+.idea

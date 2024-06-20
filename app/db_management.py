@@ -1,9 +1,10 @@
 import mysql.connector
 import os
-from os.path import join, dirname
-from dotenv import load_dotenv
-dotenv_path = join(dirname(__file__), '../.env')
-load_dotenv(dotenv_path)
+import time
+# from os.path import join, dirname
+# from dotenv import load_dotenv
+# dotenv_path = join(dirname(__file__), '../.env')
+# load_dotenv(dotenv_path)
 
 # database and user have to be created first of all
 db_name = os.getenv('db_name')
@@ -14,106 +15,138 @@ host = os.getenv('host')
 
 conn = mysql.connector.connect(host=host, user=user_db, password=pw_db, port = 3306, ssl_disabled = True)
 c = conn.cursor(buffered=True)
-
+c.execute('CREATE DATABASE IF NOT EXISTS %s CHARACTER SET utf8 COLLATE utf8_bin;' % db_name)
 
 #c.execute('DROP DATABASE data;')
-c.execute('CREATE DATABASE IF NOT EXISTS %s CHARACTER SET utf8 COLLATE utf8_bin;' % db_name)
-conn = mysql.connector.connect(host=host, user=user_db, password=pw_db, database=db_name, port = 3306, ssl_disabled = True)
-c = conn.cursor(buffered=True)
 
+db_connection = None
+db_cursor = None
+
+def get_connection():
+    global db_connection
+    if db_connection is None:
+        db_connection = mysql.connector.connect(host=os.getenv('host'), user=os.getenv('user'), password=os.getenv('root_pw'), database=os.getenv('db_name'), port = 3306, ssl_disabled = True)
+    return db_connection
+def get_cursor():
+    global db_cursor
+    if db_cursor is None:
+        db_cursor = get_connection().cursor(buffered=True)
+    return db_cursor
+
+def reset_connection():
+    global db_connection
+    global db_cursor
+    db_connection = get_connection()
+    db_cursor = get_cursor()
+
+
+reset_connection()
+
+
+def execute(query, values=None, commit=False,retry=0):
+    max_retries = 5
+    try:
+        if values is None:
+            db_cursor.execute(query)
+        else:
+            db_cursor.execute(query, values)
+        if commit:
+            db_connection.commit()
+    except Exception as e:
+        reset_connection()
+        if retry < max_retries:
+            time.sleep(1)
+            execute(query, values, commit, retry+1)
+        else:
+            raise e
+
+
+def execute_fetch_all(query, values=None, retry=0):
+    max_retries = 5
+    try:
+        if values is None:
+            db_cursor.execute(query)
+        else:
+            db_cursor.execute(query, values)
+        return db_cursor.fetchall()
+    except Exception as e:
+        reset_connection()
+        if retry < max_retries:
+            time.sleep(5)
+            execute_fetch_all(query, values, retry+1)
+        else:
+            raise e
 
 # create tables
 def create_usertable():
-    c.execute('CREATE TABLE IF NOT EXISTS userstable(user VARCHAR(100) PRIMARY KEY,password TEXT);')
+    execute('CREATE TABLE IF NOT EXISTS userstable(user VARCHAR(100) PRIMARY KEY,password TEXT);')
 
 
 def create_qandatable():
-    c.execute(
+    execute(
         'CREATE TABLE IF NOT EXISTS qandatable(rowid INTEGER auto_increment PRIMARY KEY,user VARCHAR(100), message TEXT, role VARCHAR(100), FOREIGN KEY (user) REFERENCES userstable(user));')
 
 def create_knowledgebases_private():
-    c.execute(
+    execute(
         'CREATE TABLE IF NOT EXISTS knowledgebases_private(rowid INTEGER auto_increment PRIMARY KEY,user VARCHAR(100), knowledgebase VARCHAR(100), FOREIGN KEY (user) REFERENCES userstable(user));')
 
 def create_knowledgebases_public():
-    c.execute(
+    execute(
         'CREATE TABLE IF NOT EXISTS knowledgebases_public(rowid INTEGER auto_increment PRIMARY KEY, knowledgebase VARCHAR(100), protected boolean);')
     #add protected database
     if check_if_public_knowledgebase_already_exists("index_repo4euD21openaccess"):
         add_public_knowledgebase("index_repo4euD21openaccess", True)
 
 def delete_qanda(user):
-    c.execute('DELETE FROM qandatable WHERE user = %s;', [user])
-    conn.commit()
+    execute('DELETE FROM qandatable WHERE user = %s;', [user], commit=True)
 
 def delete_private_knowledgebase(user, knowledgebase):
-    c.execute('DELETE FROM knowledgebases_private WHERE user = %s AND knowledgebase = %s;', (user, knowledgebase))
-    conn.commit()
+    execute('DELETE FROM knowledgebases_private WHERE user = %s AND knowledgebase = %s;', (user, knowledgebase), commit=True)
 
 def delete_public_knowledgebase(knowledgebase):
-    c.execute('DELETE FROM knowledgebases_public WHERE knowledgebase = %s;', [knowledgebase])
-    conn.commit()
+    execute('DELETE FROM knowledgebases_public WHERE knowledgebase = %s;', [knowledgebase], commit=True)
 
 
 def add_qandadata(username, message, role):
-    c.execute('INSERT INTO qandatable(user,message, role) VALUES (%s, %s, %s);', (username, message, role))
-    conn.commit()
+    execute('INSERT INTO qandatable(user,message, role) VALUES (%s, %s, %s);', (username, message, role), commit=True)
 
 
 def add_userdata(username, password):
-    c.execute('INSERT INTO userstable(user,password) VALUES (%s, %s);', (username, password))
-    conn.commit()
+    execute('INSERT INTO userstable(user,password) VALUES (%s, %s);', (username, password), commit =True)
 
 def add_private_knowledgebase(username, knowledgebase):
-    c.execute('INSERT INTO knowledgebases_private(user,knowledgebase) VALUES (%s, %s);', (username, knowledgebase))
-    conn.commit()
+    execute('INSERT INTO knowledgebases_private(user,knowledgebase) VALUES (%s, %s);', (username, knowledgebase), commit=True)
 
 def get_private_knowledgebase(username):
-    c.execute('SELECT * FROM knowledgebases_private WHERE user = %s;', [username])
-    data = c.fetchall()
-    return data
+    return execute_fetch_all('SELECT * FROM knowledgebases_private WHERE user = %s;', [username])
 
 def add_public_knowledgebase(knowledgebase, protected):
-    c.execute('INSERT INTO knowledgebases_public(knowledgebase, protected) VALUES (%s, %s);', (knowledgebase, protected))
-    conn.commit()
+    execute('INSERT INTO knowledgebases_public(knowledgebase, protected) VALUES (%s, %s);', (knowledgebase, protected), commit=True)
 
 def get_public_knowledgebase():
-    c.execute('SELECT * FROM knowledgebases_public')
-    data = c.fetchall()
-    return data
+    return execute_fetch_all('SELECT * FROM knowledgebases_public')
 
 
 def get_qandadata(username):
-    c.execute('SELECT * FROM qandatable WHERE user = %s;', [username])
-    data = c.fetchall()
-    return data
+    return execute_fetch_all('SELECT * FROM qandatable WHERE user = %s;', [username])
 
 
 def get_user_data(username):
-    c.execute('SELECT * FROM userstable WHERE user = %s;', [username])
-    data = c.fetchall()
-    return data
+    return execute_fetch_all('SELECT * FROM userstable WHERE user = %s;', [username])
 
 
 def check_if_user_already_exists(username):
-    c.execute('SELECT * FROM userstable WHERE user = %s;', [username])
-    data = c.fetchall()
-    return len(data) == 0
+    return len(execute_fetch_all('SELECT * FROM userstable WHERE user = %s;', [username])) == 0
 
 
 def login_user(username, password):
-    c.execute('SELECT * FROM userstable WHERE user = %s AND password = %s ;', (username, password))
-    data = c.fetchall()
-    return data
+    return execute_fetch_all('SELECT * FROM userstable WHERE user = %s AND password = %s ;', (username, password))
 
 def check_if_public_knowledgebase_already_exists(knowledgebase):
-    c.execute('SELECT * FROM knowledgebases_public WHERE knowledgebase = %s;', [knowledgebase])
-    data = c.fetchall()
-    return len(data) == 0
+    return len(execute_fetch_all('SELECT * FROM knowledgebases_public WHERE knowledgebase = %s;', [knowledgebase])) == 0
 
 def check_if_public_knowledgebase_protected(knowledgebase):
-    c.execute('SELECT * FROM knowledgebases_public WHERE knowledgebase = %s;', [knowledgebase])
-    data = c.fetchall()
+    data = execute_fetch_all('SELECT * FROM knowledgebases_public WHERE knowledgebase = %s;', [knowledgebase])
     if len(data) == 0:
         #private database -> is not protected
         print("not protected")

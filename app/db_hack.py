@@ -17,6 +17,15 @@ import os
 import base64
 
 
+# import logging
+#
+# # Set up logging
+# logging.basicConfig(
+#     filename='/tmp/app.log',
+#     level=logging.INFO,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# )
+
 def get_image_base64(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
@@ -46,6 +55,10 @@ def store_data_as_json(file_name, data):
 
 
 def chat_page_styling():
+    st.set_page_config(
+        page_title="DrugRepoChatter",
+        # page_icon=":rocket:"
+    )
     st.title("DrugRepoChatter")
     st.header("Questions and  Answering Chatbot")
     st.write(
@@ -408,6 +421,7 @@ def logout():
 
 
 def main():
+    chat_page_styling()
     if "messages" not in st.session_state.keys() and "messagesqanda" not in st.session_state.keys():
         st.session_state["user"] = ""
         st.session_state["password"] = ""
