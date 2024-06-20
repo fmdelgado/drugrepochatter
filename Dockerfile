@@ -15,16 +15,27 @@ ADD app /app
 # Upgrade pip and setuptools
 RUN pip install --no-cache-dir --upgrade pip setuptools
 
-# Install necessary packages
+
+# Install necessary packages, including cron
 RUN apt-get update && \
-    apt-get -y install gcc mono-mcs && \
+    apt-get -y install gcc mono-mcs cron && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Add your cron job file
+ADD cronjob /etc/cron.d/keep-db-alive
+
+# Give execution rights on the cron job and apply it
+RUN chmod 0644 /etc/cron.d/keep-db-alive && \
+    crontab /etc/cron.d/keep-db-alive
+
+# Create the log file to be able to run tail
+RUN touch /var/log/cron.log
+
 # Make port 8501 available to the world outside this container
 EXPOSE 8501
 
-# Run db_hack.py when the container launches
-CMD ["streamlit", "run", "db_hack.py"]
+# Command to start the services
+CMD cron && tail -f /var/log/cron.log & streamlit run db_hack.py
