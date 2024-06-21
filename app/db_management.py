@@ -19,32 +19,34 @@ c.execute('CREATE DATABASE IF NOT EXISTS %s CHARACTER SET utf8 COLLATE utf8_bin;
 
 #c.execute('DROP DATABASE data;')
 
-db_connection = None
-db_cursor = None
+# db_connection = None
+# db_cursor = None
 
 def get_connection():
-    global db_connection
-    if db_connection is None:
-        db_connection = mysql.connector.connect(host=os.getenv('host'), user=os.getenv('user'), password=os.getenv('root_pw'), database=os.getenv('db_name'), port = 3306, ssl_disabled = True)
-    return db_connection
+    # global db_connection
+    # if db_connection is None:
+    #     db_connection = mysql.connector.connect(host=os.getenv('host'), user=os.getenv('user'), password=os.getenv('root_pw'), database=os.getenv('db_name'), port = 3306, ssl_disabled = True)
+    return mysql.connector.connect(host=os.getenv('host'), user=os.getenv('user'), password=os.getenv('root_pw'), database=os.getenv('db_name'), port = 3306, ssl_disabled = True)
 def get_cursor():
-    global db_cursor
-    if db_cursor is None:
-        db_cursor = get_connection().cursor(buffered=True)
-    return db_cursor
-
-def reset_connection():
-    global db_connection
-    global db_cursor
+    # global db_cursor
     db_connection = get_connection()
-    db_cursor = get_cursor()
+    # if db_cursor is None:
+    #     db_cursor = get_connection().cursor(buffered=True)
+    return (db_connection, db_connection.cursor(buffered=True))
+
+# def reset_connection():
+#     global db_connection
+#     global db_cursor
+#     db_connection = get_connection()
+#     db_cursor = get_cursor()
 
 
-reset_connection()
+# reset_connection()
 
 
 def execute(query, values=None, commit=False,retry=0):
     max_retries = 5
+    db_connection, db_cursor = get_cursor()
     try:
         if values is None:
             db_cursor.execute(query)
@@ -53,16 +55,18 @@ def execute(query, values=None, commit=False,retry=0):
         if commit:
             db_connection.commit()
     except Exception as e:
-        reset_connection()
         if retry < max_retries:
             time.sleep(1)
             execute(query, values, commit, retry+1)
         else:
             raise e
+    finally:
+        db_connection.close()
 
 
 def execute_fetch_all(query, values=None, retry=0):
     max_retries = 5
+    db_connection, db_cursor = get_cursor()
     try:
         if values is None:
             db_cursor.execute(query)
@@ -70,12 +74,14 @@ def execute_fetch_all(query, values=None, retry=0):
             db_cursor.execute(query, values)
         return db_cursor.fetchall()
     except Exception as e:
-        reset_connection()
+        # reset_connection()
         if retry < max_retries:
             time.sleep(5)
             execute_fetch_all(query, values, retry+1)
         else:
             raise e
+    finally:
+        db_connection.close()
 
 # create tables
 def create_usertable():
