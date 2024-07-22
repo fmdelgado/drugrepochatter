@@ -1,9 +1,10 @@
-# Use an official Python runtime as a parent image
-FROM python:3.8-slim-buster
+# Use a more recent base image
+FROM python:3.11-slim-bullseye
 
 # Install necessary packages
 RUN apt-get update && \
     apt-get -y install gcc mono-mcs cron && \
+    apt-get -y upgrade openssl libssl-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Set the working directory in the container to /app
