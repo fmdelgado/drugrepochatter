@@ -60,16 +60,6 @@ def chat_page_styling():
         # page_icon=":rocket:"
     )
     st.title("DrugRepoChatter")
-    st.header("Questions and  Answering Chatbot")
-    st.write(
-        """
-        This chatbot is your expert assistant in the field of drug repurposing. 
-           Leveraging a knowledge base derived from a variety of scientific documents related to your topic of choice,
-           it can provide detailed insights and answers to your queries! 📚
-
-           To customize the knowledge base, please navigate to the *Configure Knowledge Base* page.
-            """
-    )
 
 
 def reproduce_chat_if_user_logged_in(typeOfMessage):
@@ -118,12 +108,35 @@ def save_message_in_db(typeOfChat, message):
 
 
 def get_user_message(typeOfChat):
-    if prompt := st.chat_input():
+    if st.session_state["knowledgebase"] == "index_repo4euD21openaccess":
+        suggested_questions = [
+            "What's NeDRex?",
+            "What are the major databases for anticancer drug sensitivity screening?",
+            "What role does network-based inference play in drug repurposing?",
+            "How can we use deep learning for drug repurposing?"
+        ]
+
+        col1, col2 = st.columns([3, 1])
+
+        with col1:
+            user_input = st.text_input("Your question:", key="user_input")
+
+        with col2:
+            selected_question = st.selectbox("Or choose a suggested question:",
+                                             [""] + suggested_questions,
+                                             key="suggested_question")
+
+        prompt = user_input if user_input else selected_question
+    else:
+        prompt = st.text_input("Your question:", key="user_input")
+
+    if prompt:
         message = {"role": "user", "content": prompt}
         st.session_state[typeOfChat].append(message)
         if is_user_logged_in():
             save_message_in_db(typeOfChat, message)
-    return prompt
+        return prompt
+    return None
 
 
 def config_page():
@@ -230,13 +243,19 @@ def process_llm_response(llm_response, doc_content=True):
 
 
 def qanda_page():
+    parameter_descriptions = {
+        "score_threshold": "The minimum relevance score for retrieved documents. Range: 0.0 to 1.0. Default: 0.9. Lower values include more documents, higher values are more selective.",
+        "k": "The number of most relevant documents to return. Range: 1 to 50. Default: 4. Higher values provide more diverse information but may include less relevant documents.",
+        "fetch_k": "The number of documents to initially retrieve before filtering. Range: 1 to 50. Default: 20. Higher values cast a wider initial net but may slow down the process."
+    }
+
     chaintype = "stuff"
     score_threshold = 0.9
-    score_threshold = st.slider("Score threshold", min_value=0.0, max_value=1.0, value=score_threshold, step=0.1)
+    score_threshold = st.slider("Score threshold", min_value=0.0, max_value=1.0, value=score_threshold, step=0.1, help=parameter_descriptions["score_threshold"])
     default_k = 4
-    selected_k = st.slider("k", min_value=1, max_value=50, value=default_k, step=1)
+    selected_k = st.slider("k", min_value=1, max_value=50, value=default_k, step=1, help=parameter_descriptions["k"])
     default_fetch_k = 20
-    selected_fetch_k = st.slider("fetch_k", min_value=1, max_value=50, value=default_fetch_k, step=1)
+    selected_fetch_k = st.slider("fetch_k", min_value=1, max_value=50, value=default_fetch_k, step=1, help=parameter_descriptions["fetch_k"])
     show_sources = st.checkbox("Show texts in original docs", False)
 
     st.title("DrugRepoChatter")
@@ -345,6 +364,51 @@ def about_page():
     st.markdown("""
     DrugRepoChatter is an AI-powered assistant for academic research. It is a tool that helps researchers to find relevant information in a large corpus of scientific documents.
     To begin, just upload your PDF files and DrugRepoChatter will create a knowledge base that you can query using natural language. 
+    
+    ## User Guide
+    
+    1. **Sign Up/Login**: Create an account or log in to access all features.
+    
+    2. **Configure Knowledge Base**: 
+       - Select an existing knowledge base or create a new one.
+       - To create a new base, upload PDF files and give your index a unique name.
+       - The default knowledge base, created by the REPO4EU consortium, contains full-text of 285 carefully curated publications on drug repurposing.
+    
+    3. **Default REPO4EU Knowledge Base**:
+       - This database was created through a rigorous curation process:
+         - Articles were sourced from PubMed and Google Scholar.
+         - Each article was evaluated for relevance, quality, and contribution to drug repurposing.
+         - Inclusion criteria ensured programmatic usability, community acceptance, and open access.
+       - The curation process focused on:
+         - Tools and methods with programmatic interfaces (API, code) or user-friendly interfaces.
+         - Databases and data resources.
+         - Publications with significant citations or recent high-impact works.
+         - Exclusively open-access articles for unrestricted access.
+       - For a complete list of the curated articles, visit our [Online spreadsheet](https://docs.google.com/spreadsheets/d/17bVO2Jhvs3435q44Z3HjL3nZf4zU8BSXO9pbUxN2Za4/edit?usp=sharing).
+    
+    ## Using the Q&A Feature
+    
+    1. Navigate to the Q&A page.
+    2. Adjust the search parameters:
+       - **Score threshold** (0.0-1.0): Sets the minimum relevance score for retrieved documents.
+       - **k** (1-50): Determines the number of most relevant documents to return.
+       - **fetch_k** (1-50): Sets the initial number of documents to retrieve before filtering.
+    3. Type your question in the chat input.
+    4. View the AI-generated response and sources.
+    5. Use the "Clear Chat" button to start a new conversation.
+    
+    ## Tips for Effective Use
+    
+    - Be specific in your questions to get more accurate responses.
+    - Experiment with different search parameters to fine-tune your results.
+    - Remember, DrugRepoChatter's knowledge is based on the documents in the selected knowledge base.
+    
+    ## Limitations
+    
+    - The tool is focused on drug repurposing, omics data, bioinformatics, and data analysis.
+    - Responses are generated based on the content of the knowledge base, not real-time data.
+    
+    For any issues or further questions, please contact our support team.
     """)
 
     # Display images using HTML

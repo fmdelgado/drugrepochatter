@@ -6,6 +6,7 @@ import os
 from os.path import join, dirname
 from dotenv import load_dotenv
 dotenv_path = join(dirname(__file__), '../.env')
+# dotenv_path = "/Users/fernando/Documents/Research/drugrepochatter/.env"
 load_dotenv(dotenv_path)
 
 protocol = os.getenv('protocol_ollama')
@@ -22,3 +23,9 @@ jwt = json.loads(auth_response.text)["token"]
 
 ollama_embeddings = OllamaEmbeddings(base_url=api_url, model="nomic-embed-text", headers={"Authorization": "Bearer " + jwt})
 ollama_llm = Ollama(base_url=api_url, model= os.getenv('ollama_model'), temperature=0.0, headers={"Authorization": "Bearer " + jwt})
+
+ollama_llm.invoke("hello, who are you?")
+# What are the major databases for anticancer drug sensitivity screening?
+# What role does network-based inference play in drug repurposing?
+# How can we use deep learning for drug repurposing?
+# What's NeDRex?
