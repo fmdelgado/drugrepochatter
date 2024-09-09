@@ -252,7 +252,7 @@ def qanda_page():
     chaintype = "stuff"
     score_threshold = 0.9
     score_threshold = st.slider("Score threshold", min_value=0.0, max_value=1.0, value=score_threshold, step=0.1, help=parameter_descriptions["score_threshold"])
-    default_k = 4
+    default_k = 3
     selected_k = st.slider("k", min_value=1, max_value=50, value=default_k, step=1, help=parameter_descriptions["k"])
     default_fetch_k = 20
     selected_fetch_k = st.slider("fetch_k", min_value=1, max_value=50, value=default_fetch_k, step=1, help=parameter_descriptions["fetch_k"])
