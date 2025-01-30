@@ -5,13 +5,12 @@ from my_pdf_lib import load_index_from_db, store_index_in_db, get_index_for_pdf
 from db_management import *
 from db_chat import user_message, bot_message
 import json
-from langchain.chains import RetrievalQA
-from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
+
+from selfRAG_drugrepochatter import app
 import markdown
 import hashlib
 from streamlit_option_menu import option_menu
-from ollama_connector import ollama_embeddings, ollama_llm
-from langchain.prompts import PromptTemplate
+
 import time
 import os
 import base64
@@ -99,7 +98,8 @@ def clear_chat(typeOfChat):
     # delete chat in DB as well
     if typeOfChat == "messagesqanda":
         delete_qanda(st.session_state["user"])
-    st.experimental_rerun()
+    st.session_state['force_rerun'] = time.time() # Hack to force rerun
+    # st.rerun() # Remove or comment out st.rerun() if using this hack
 
 
 def save_message_in_db(typeOfChat, message):
@@ -295,47 +295,57 @@ def qanda_page():
             botmsg = bot_message("...", bot_name="DrugRepoChatter")
 
         try:
+            # from langchain_community.vectorstores import FAISS
+            # index_name = "repo4euD21openaccess"
+            # index = FAISS.load_local(f"/Users/fernando/Documents/Research/drugrepochatter/app/indexes/index_{index_name}", ollama_embeddings, allow_dangerous_deserialization=True)
+            # score_threshold=0.9
+            # selected_k=3
+            # selected_fetch_k=5
 
-            PROMPT_TEMPLATE = """Answer the question based only on the following context:\
-                                {context}\
-                                You are allowed to rephrase the answer based on the context. \
-                                Do not answer any questions using your pre-trained knowledge, only use the information provided in the context.\
-                                Do not answer any questions that do not relate to drug repurposing, omics data, bioinformatics and data anlaysis.\
-                                If none of the articles answer the question, just say you don't know.  
-                                Question: {question}
-                              """
-            PROMPT = PromptTemplate.from_template(PROMPT_TEMPLATE)
+            retriever = index.as_retriever(search_type="mmr",
+                               search_kwargs={'score_threshold': score_threshold,
+                                              'fetch_k': selected_fetch_k,
+                                              'k': selected_k})
+            inputs = {
+                "question": prompt,
+                "retriever": retriever,  # if your pipeline expects it
+            }
+            final_state = app.invoke(inputs)
+            final_answer = final_state.get("generation", "")
+            source_mapping = final_state.get("source_mapping", {})
+            html_content = markdown.markdown(final_answer)
 
-            # tag::qa[]
-            qa_chain = RetrievalQA.from_chain_type(
-                llm=ollama_llm,
-                chain_type=chaintype,
-                chain_type_kwargs={"prompt": PROMPT},
-                retriever=index.as_retriever(search_type="mmr",
-                                             search_kwargs={'score_threshold': score_threshold,
-                                                            'fetch_k': selected_fetch_k,
-                                                            'k': selected_k}),
-                return_source_documents=True
-            )
-
-            llm_response = qa_chain({"query": prompt})
-
-            # text = f"{llm_response['result']}\nSources:\n{process_llm_response(llm_response, doc_content=showdocs)}"
-            # Convert Markdown to HTML
-            html_content = markdown.markdown(llm_response['result'])
-            if "In your provided context I don" in llm_response['result']:
-                text = f"{html_content}"
+            if "I'm sorry" in final_answer or "do not contain information" in final_answer:
+                # If the pipeline explicitly says it doesn’t know
+                text = html_content
             else:
-                text = f"{html_content}<br><strong>Sources:</strong><br>{process_llm_response(llm_response, doc_content=show_sources)}"
-            result = "".join(text).strip()
-            botmsg.update(result)
-            message = {"role": "assistant", "content": result}
-            st.session_state["messagesqanda"].append(message)
-            if is_user_logged_in():
-                save_message_in_db("messagesqanda", message)
+                # Show sources if user wants
+                if show_sources and source_mapping:
+                    # Build a sources HTML snippet
+                    sources_html = "<br><strong>Sources:</strong><ul>"
+                    for i, doc in enumerate(final_state["documents"], start=1):
+                        page = doc.metadata.get("page", "")
+                        short_content = doc.page_content[:300]  # first 300 chars
+                        sources_html += (
+                            f"<li><b>Doc {i}</b> "
+                            f"(Page {page}): {short_content}...</li>"
+                        )
+                    sources_html += "</ul>"
+                    text = f"{html_content}{sources_html}"
+                else:
+                    text = html_content
+
+                botmsg.update(text)
+
+                # 6) Also store in session state / database
+                message = {"role": "assistant", "content": text}
+                st.session_state["messagesqanda"].append(message)
+                if is_user_logged_in():
+                    save_message_in_db("messagesqanda", message)
+
         except Exception as e:
-            # st.write(e)
-            st.error("Something went wrong while producing a response.")
+            st.error(f"Something went wrong while producing a response: {e}")
+
     if len(st.session_state["messagesqanda"]) != 0 and st.button("Clear Chat"):
         clear_chat("messagesqanda")
 
