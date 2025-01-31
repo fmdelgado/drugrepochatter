@@ -1,16 +1,10 @@
-import os
-import streamlit as st
 import re
-import time
 from io import BytesIO
 from typing import Any, Dict, List
-import pickle
 from langchain.docstore.document import Document
-from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from pypdf import PdfReader
-import faiss
 from ollama_connector import ollama_embeddings
 # where to  import user/password asnd so on? to connect ot the ur?
 
@@ -47,7 +41,7 @@ def text_to_docs(text: str, filename: str) -> List[Document]:
 
     for doc in page_docs:
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=4000,
+            chunk_size=2000,
             separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""],
             chunk_overlap=100,
         )
