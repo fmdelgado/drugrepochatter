@@ -34,7 +34,7 @@ ollama_llm = ChatOllama(
     num_predict=-1,
     top_k=100,
     top_p=0.95,
-    format="json",
+    # format="json",
     client_kwargs={'headers': headers})
 
 # ollama_llm.invoke("hello, who are you?")

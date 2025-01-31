@@ -6,7 +6,7 @@ from db_management import *
 from db_chat import user_message, bot_message
 import json
 
-from selfRAG_drugrepochatter import app
+from selfRAG_drugrepochatter import app, clean_answer, remap_source_citations
 import markdown
 import hashlib
 from streamlit_option_menu import option_menu
@@ -250,12 +250,13 @@ def qanda_page():
     }
 
     chaintype = "stuff"
-    score_threshold = 0.9
-    score_threshold = st.slider("Score threshold", min_value=0.0, max_value=1.0, value=score_threshold, step=0.1, help=parameter_descriptions["score_threshold"])
+    score_threshold = 0.5
+    # score_threshold = st.slider("Score threshold", min_value=0.0, max_value=1.0, value=score_threshold, step=0.1, help=parameter_descriptions["score_threshold"])
     default_k = 3
-    selected_k = st.slider("k", min_value=1, max_value=50, value=default_k, step=1, help=parameter_descriptions["k"])
+    selected_k = st.slider("k", min_value=10, max_value=50, value=default_k, step=1, help=parameter_descriptions["k"])
     default_fetch_k = 20
-    selected_fetch_k = st.slider("fetch_k", min_value=1, max_value=50, value=default_fetch_k, step=1, help=parameter_descriptions["fetch_k"])
+    selected_fetch_k = default_fetch_k
+    # selected_fetch_k = st.slider("fetch_k", min_value=1, max_value=50, value=default_fetch_k, step=1, help=parameter_descriptions["fetch_k"])
     show_sources = st.checkbox("Show texts in original docs", False)
 
     st.title("DrugRepoChatter")
@@ -296,52 +297,108 @@ def qanda_page():
 
         try:
             # from langchain_community.vectorstores import FAISS
+            # import sys
+            # sys.path.append("/Users/fernando/Documents/Research/drugrepochatter/app")
+            # import json
+            # from selfRAG_drugrepochatter import app, clean_answer, remap_source_citations
+            # from ollama_connector import ollama_llm, ollama_embeddings
+            # import markdown
+            # import hashlib
+            # from streamlit_option_menu import option_menu
+            # import time
+            # import os
+            # import base64
+
             # index_name = "repo4euD21openaccess"
             # index = FAISS.load_local(f"/Users/fernando/Documents/Research/drugrepochatter/app/indexes/index_{index_name}", ollama_embeddings, allow_dangerous_deserialization=True)
             # score_threshold=0.9
-            # selected_k=3
-            # selected_fetch_k=5
+            # selected_k=10
+            # selected_fetch_k=20
+            # prompt = "what databases can i use to find associations between genes and diseases?"
+            # show_sources = True
+            # -----------
 
-            retriever = index.as_retriever(search_type="mmr",
-                               search_kwargs={'score_threshold': score_threshold,
-                                              'fetch_k': selected_fetch_k,
-                                              'k': selected_k})
+            retriever = index.as_retriever(
+                search_type="mmr",
+                search_kwargs={
+                    'score_threshold': score_threshold,
+                    'fetch_k': selected_fetch_k,
+                    'k': selected_k
+                }
+            )
             inputs = {
                 "question": prompt,
                 "retriever": retriever,  # if your pipeline expects it
             }
+
             final_state = app.invoke(inputs)
             final_answer = final_state.get("generation", "")
-            source_mapping = final_state.get("source_mapping", {})
-            html_content = markdown.markdown(final_answer)
+            source_mapping = final_state.get("documents", {})
+            # print(final_answer)
+            docs_list = source_mapping if isinstance(source_mapping, list) else list(source_mapping)
 
-            if "I'm sorry" in final_answer or "do not contain information" in final_answer:
-                # If the pipeline explicitly says it doesn’t know
-                text = html_content
+            # Now remap the citations in the final answer:
+            remapped_answer = remap_source_citations(final_answer, docs_list)
+            # Then continue with cleaning / printing
+            cleaned_final_answer = clean_answer(remapped_answer)
+            # print(cleaned_final_answer)
+
+            html_content = markdown.markdown(cleaned_final_answer)
+
+            if show_sources:
+                sources_html = "<br><strong>Sources:</strong><ul>"
+                for i, doc in enumerate(docs_list, start=1):
+                    metadata = doc.metadata
+                    citation_parts = []
+                    # Prioritize author(s)
+                    if any(author_key in metadata for author_key in ["Author", "Authors"]):
+                        author_keys = [author_key for author_key in ["Author", "Authors"] if author_key in metadata]
+                        for author_key in author_keys:
+                            if isinstance(metadata[author_key], str):
+                                citation_parts.append(metadata[author_key])
+                            elif isinstance(metadata[author_key], list):
+                                citation_parts.extend(metadata[author_key])
+
+                    # Add title
+                    if any(title_key in metadata for title_key in ["Title", "title"]):
+                        title_key = next((title_key for title_key in ["Title", "title"] if title_key in metadata),
+                                         None)
+                        if title_key:
+                            citation_parts.append(f"<i>{metadata[title_key]}</i>")
+
+                    # Add DOI if available
+                    if "DOI" in metadata:
+                        citation_parts.append(
+                            f"DOI: <a href='https://doi.org/{metadata['DOI']}' target='_blank'>{metadata['DOI']}</a>")
+
+                    # Add page number if available
+                    if "page" in metadata:
+                        citation_parts.append(f"(Page {metadata['page']})")
+
+                    # Build the citation string
+                    if citation_parts:
+                        citation_str = ", ".join(citation_parts) + "."
+                    else:
+                        # Fallback to short content if no citation info is available
+                        short_content = doc.page_content[:300]
+                        citation_str = f"Relevant excerpt (Page {metadata.get('page', 'N/A')}): {short_content}..."
+
+                    sources_html += f"<li><b>Source {i}:</b> {citation_str}</li>"
+
+                sources_html += "</ul>"
+                text = f"{html_content}{sources_html}"
             else:
-                # Show sources if user wants
-                if show_sources and source_mapping:
-                    # Build a sources HTML snippet
-                    sources_html = "<br><strong>Sources:</strong><ul>"
-                    for i, doc in enumerate(final_state["documents"], start=1):
-                        page = doc.metadata.get("page", "")
-                        short_content = doc.page_content[:300]  # first 300 chars
-                        sources_html += (
-                            f"<li><b>Doc {i}</b> "
-                            f"(Page {page}): {short_content}...</li>"
-                        )
-                    sources_html += "</ul>"
-                    text = f"{html_content}{sources_html}"
-                else:
-                    text = html_content
+                text = html_content
 
-                botmsg.update(text)
+            # Now `text` should contain a more paragraph-style answer with citations [Source X].
+            # print(text)
+            botmsg.update(text)
 
-                # 6) Also store in session state / database
-                message = {"role": "assistant", "content": text}
-                st.session_state["messagesqanda"].append(message)
-                if is_user_logged_in():
-                    save_message_in_db("messagesqanda", message)
+            # 6) Also store in session state / database
+            message = {"role": "assistant", "content": text}
+            st.session_state["messagesqanda"].append(message)
+            if is_user_logged_in():
+                save_message_in_db("messagesqanda", message)
 
         except Exception as e:
             st.error(f"Something went wrong while producing a response: {e}")
