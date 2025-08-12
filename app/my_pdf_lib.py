@@ -6,7 +6,14 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from pypdf import PdfReader
 from ollama_connector import ollama_embeddings
+import os
+from pathlib import Path
+
 # where to  import user/password asnd so on? to connect ot the ur?
+
+# Define the absolute path to the indexes directory
+APP_ROOT = Path(__file__).resolve().parent
+INDEX_BASE = Path(os.getenv("FAISS_INDEX_DIR", APP_ROOT / "indexes"))
 
 
 def parse_pdf(file: BytesIO) -> List[str]:
@@ -68,8 +75,18 @@ def get_index_for_pdf(pdf_files):
 
 
 def store_index_in_db(index, name):
-    index.save_local(f"indexes/{name}")
+    index_dir = INDEX_BASE / name
+    # Create the directory if it doesn't exist
+    index_dir.mkdir(parents=True, exist_ok=True)
+    index.save_local(str(index_dir))
 
 def load_index_from_db(index_name):
-    index = FAISS.load_local(f"indexes/{index_name}", ollama_embeddings, allow_dangerous_deserialization=True)
+    index_dir = INDEX_BASE / index_name
+    faiss_path = index_dir / "index.faiss"
+    pkl_path   = index_dir / "index.pkl"
+
+    if not faiss_path.exists() or not pkl_path.exists():
+        raise FileNotFoundError(f"FAISS index missing: {faiss_path} or {pkl_path}")
+
+    index = FAISS.load_local(str(index_dir), ollama_embeddings, allow_dangerous_deserialization=True)
     return index
